@@ -36,11 +36,11 @@ def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbo
     
     # Ensure at least one of each type
     password_parts = []
-    if use_uppercase:
+    if use_uppercase and uppercase:
         password_parts.append(random.choice(uppercase))
-    if use_numbers:
+    if use_numbers and numbers:
         password_parts.append(random.choice(numbers))
-    if use_symbols:
+    if use_symbols and symbols:
         password_parts.append(random.choice(symbols))
     password_parts.append(random.choice(lowercase))
     
