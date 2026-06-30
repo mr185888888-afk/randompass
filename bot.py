@@ -1,6 +1,7 @@
 import random
 import string
 import logging
+import threading
 from typing import Dict, Any
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -34,7 +35,6 @@ def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbo
     if not all_chars:
         all_chars = lowercase
     
-    # Ensure at least one of each type
     password_parts = []
     if use_uppercase and uppercase:
         password_parts.append(random.choice(uppercase))
@@ -426,8 +426,31 @@ async def number_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
+# Simple web server to keep Railway happy
+def run_web_server():
+    """Run a simple HTTP server for Railway health checks"""
+    try:
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK")
+        
+        server = HTTPServer(('0.0.0.0', Config.PORT), HealthHandler)
+        logger.info(f"Web server running on port {Config.PORT}")
+        server.serve_forever()
+    except Exception as e:
+        logger.error(f"Web server error: {e}")
+
 def main():
     """Start the bot"""
+    # Start web server in background thread for Railway health checks
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+    
+    # Start Telegram bot
     application = Application.builder().token(Config.BOT_TOKEN).build()
     
     # Command handlers
@@ -445,7 +468,7 @@ def main():
     # Error handler
     application.add_error_handler(error_handler)
     
-    print("🤖 Bot is running...")
+    logger.info("🤖 Bot is running...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
