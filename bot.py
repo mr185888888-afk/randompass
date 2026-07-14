@@ -51,7 +51,7 @@ def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbo
     random.shuffle(password_parts)
     return ''.join(password_parts)
 
-# Start command
+# Start command - UPDATED WITH NEW WELCOME MESSAGE
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -59,17 +59,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎲 Generate Number", callback_data='number')
         ],
         [
-            InlineKeyboardButton("❓ Help", callback_data='help'),
+            InlineKeyboardButton("📊 Prime Analysis", url='https://t.me/PRIMEANALYS'),
+            InlineKeyboardButton("❓ Help", callback_data='help')
+        ],
+        [
             InlineKeyboardButton("ℹ️ About", callback_data='about')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     welcome_text = (
-        "👋 *Welcome to RandomBot!*\n\n"
-        "I can help you generate:\n"
-        "🔐 *Strong passwords* with uppercase, numbers & symbols\n"
-        "🎲 *Random numbers* with customizable ranges\n\n"
+        "🏅📊 *Welcome to Prime Analysis!*\n\n"
+        "Your ultimate source for real-time sports betting insights. "
+        "Get expert predictions, stats and tips to sharpen your betting game. "
+        "Join us for updates and discussions as we keep you ahead of the curve 📊\n\n"
+        "👉 *Join our channel:* @PrimeAnalysiss\n\n"
+        "───────────────────\n"
+        "🔐 *RandomPass Bot Features:*\n"
+        "• Generate strong passwords with uppercase, numbers & symbols\n"
+        "• Generate random numbers with customizable ranges\n"
+        "• All in one convenient bot!\n\n"
         "Choose an option below to get started!"
     )
     
@@ -166,6 +175,7 @@ async def generate_password_handler(update: Update, context: ContextTypes.DEFAUL
     keyboard = [
         [InlineKeyboardButton("📋 Copy", callback_data=f'copy_{password}')],
         [InlineKeyboardButton("🔄 Generate Another", callback_data='password')],
+        [InlineKeyboardButton("📊 Prime Analysis", url='https://t.me/PRIMEANALYS')],
         [InlineKeyboardButton("🔙 Back to Menu", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -176,7 +186,8 @@ async def generate_password_handler(update: Update, context: ContextTypes.DEFAUL
         f"Length: {length} characters\n"
         f"Uppercase: {'✅' if settings['uppercase'] else '❌'}\n"
         f"Numbers: {'✅' if settings['numbers'] else '❌'}\n"
-        f"Symbols: {'✅' if settings['symbols'] else '❌'}",
+        f"Symbols: {'✅' if settings['symbols'] else '❌'}\n\n"
+        f"📊 *Join Prime Analysis for betting insights!*",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -209,6 +220,7 @@ async def generate_number_handler(update: Update, context: ContextTypes.DEFAULT_
     
     keyboard = [
         [InlineKeyboardButton("🔄 Generate Another", callback_data='number')],
+        [InlineKeyboardButton("📊 Prime Analysis", url='https://t.me/PRIMEANALYS')],
         [InlineKeyboardButton("🔙 Back to Menu", callback_data='main_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -216,7 +228,8 @@ async def generate_number_handler(update: Update, context: ContextTypes.DEFAULT_
     await query.edit_message_text(
         f"🎲 *Random Number*\n\n"
         f"**{random_num}**\n\n"
-        f"Range: {min_val} - {max_val}",
+        f"Range: {min_val} - {max_val}\n\n"
+        f"📊 *Join Prime Analysis for betting insights!*",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -249,6 +262,7 @@ async def handle_custom_range(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         keyboard = [
             [InlineKeyboardButton("🔄 Generate Another", callback_data='number')],
+            [InlineKeyboardButton("📊 Prime Analysis", url='https://t.me/PRIMEANALYS')],
             [InlineKeyboardButton("🔙 Back to Menu", callback_data='main_menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -256,7 +270,8 @@ async def handle_custom_range(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             f"🎲 *Random Number*\n\n"
             f"**{random_num}**\n\n"
-            f"Range: {min_val} - {max_val}",
+            f"Range: {min_val} - {max_val}\n\n"
+            f"📊 *Join Prime Analysis for betting insights!*",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -359,7 +374,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Show main menu\n"
         "/help - Show this help message\n"
         "/password - Generate a password\n"
-        "/number - Generate a number"
+        "/number - Generate a number\n\n"
+        "*Join our channel:* @PrimeAnalysiss 📊"
     )
     
     if query:
@@ -378,7 +394,10 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "This bot combines two powerful random generation tools:\n"
         "• Random Password Generator\n"
         "• Random Number Generator\n\n"
-        "🔒 Secure and private - no data is stored."
+        "🔒 Secure and private - no data is stored.\n\n"
+        "📊 *Prime Analysis Premium*\n"
+        "Your ultimate source for real-time sports betting insights.\n"
+        "👉 @PrimeAnalysiss"
     )
     
     await query.edit_message_text(about_text, parse_mode='Markdown')
@@ -426,7 +445,7 @@ async def number_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
-# Simple web server to keep Railway happy
+# Simple web server for Railway
 def run_web_server():
     """Run a simple HTTP server for Railway health checks"""
     try:
