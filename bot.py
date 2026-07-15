@@ -34,6 +34,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("👑 Admin", url='https://t.me/PrimeAnalysiss'),
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
+        ],
+        [
+            InlineKeyboardButton("🎬 Get Video ID", callback_data='video_help')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -58,9 +61,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
-# Handle video upload - get file ID and file path
+# Video help handler
+async def video_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    help_text = (
+        "🎬 *How to Get Video File ID*\n\n"
+        "*Method 1: Send Video to Bot*\n"
+        "1. Send a video to this bot\n"
+        "2. Bot will reply with the File ID\n"
+        "3. Copy and use the ID anywhere\n\n"
+        "*Method 2: Use getUpdates API*\n"
+        "1. Send a video to your bot\n"
+        "2. Visit this URL:\n"
+        f"`https://api.telegram.org/bot{Config.BOT_TOKEN}/getUpdates`\n"
+        "3. Find the 'file_id' in the response\n\n"
+        "*Method 3: Use getFile API*\n"
+        "1. After getting file_id, use:\n"
+        f"`https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id=YOUR_FILE_ID`\n\n"
+        "*How to use File ID:*\n"
+        "```python\n"
+        "await bot.send_video(\n"
+        "    chat_id=chat_id,\n"
+        "    video='FILE_ID_HERE',\n"
+        "    caption='Your caption'\n"
+        ")\n"
+        "```\n\n"
+        "📤 *Send a video now to get its ID!*"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("👑 Admin", url='https://t.me/PrimeAnalysiss')],
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data='start')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        help_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+# Handle video upload - get file ID
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video uploads and return file ID and file path"""
+    """Handle video uploads and return file ID"""
     
     if not update.message.video:
         return
@@ -72,48 +117,30 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id = video.file_id
     file_unique_id = video.file_unique_id
     
-    # Get file path using getFile API
+    # Try to get more info using the API
     try:
-        # Method 1: Using python-telegram-bot's built-in method
         file = await context.bot.get_file(file_id)
         file_path = file.file_path
-        
-        # Method 2: Using direct API call (optional)
-        api_url = f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}"
-        response = requests.get(api_url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('ok'):
-                api_file_path = data.get('result', {}).get('file_path')
-            else:
-                api_file_path = "API Error"
-        else:
-            api_file_path = "API Request Failed"
-            
     except Exception as e:
-        logger.error(f"Error getting file info: {e}")
-        file_path = "Error getting file path"
-        api_file_path = "Error"
+        logger.error(f"Error getting file: {e}")
+        file_path = "Could not retrieve"
     
     keyboard = [
         [InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{file_id}')],
-        [InlineKeyboardButton("📋 Copy File Path", callback_data=f'copypath_{file_path}')],
         [InlineKeyboardButton("👑 Admin", url='https://t.me/PrimeAnalysiss')],
         [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"✅ *Video uploaded successfully!*\n\n"
+        f"✅ *Video Received!*\n\n"
         f"📹 *File ID:* `{file_id}`\n"
         f"🆔 *Unique ID:* `{file_unique_id}`\n"
         f"📁 *File Path:* `{file_path}`\n"
         f"⏱️ *Duration:* {video.duration}s\n"
-        f"📏 *Size:* {video.width}x{video.height}\n"
-        f"📦 *File Size:* {video.file_size} bytes\n"
+        f"📏 *Resolution:* {video.width}x{video.height}\n"
         f"👤 *Uploaded by:* {user.first_name}\n\n"
-        f"*Click buttons below to copy the ID or path.*",
+        f"*Click the button below to copy the File ID*",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -128,97 +155,34 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         f"📋 *File ID copied to clipboard!*\n\n"
         f"`{file_id}`\n\n"
-        f"*Note:* Select and copy the ID manually.",
+        f"*How to use this ID:*\n"
+        f"```python\n"
+        f"await bot.send_video(\n"
+        f"    chat_id=chat_id,\n"
+        f"    video='{file_id}',\n"
+        f"    caption='Your caption'\n"
+        f")\n"
+        f"```",
         parse_mode='Markdown'
     )
 
-# Copy File Path handler
-async def copy_file_path(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Start from callback
+async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    file_path = query.data.replace('copypath_', '')
-    
-    await query.message.reply_text(
-        f"📋 *File Path copied to clipboard!*\n\n"
-        f"`{file_path}`\n\n"
-        f"*Note:* Select and copy the path manually.\n\n"
-        f"*Download URL:*\n"
-        f"`https://api.telegram.org/file/bot{Config.BOT_TOKEN}/{file_path}`",
-        parse_mode='Markdown'
-    )
-
-# Get updates handler (for manual API testing)
-async def get_updates_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Get recent updates from Telegram API"""
-    try:
-        api_url = f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getUpdates"
-        response = requests.get(api_url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get('ok'):
-                updates = data.get('result', [])
-                
-                if updates:
-                    # Find the latest video message
-                    for upd in updates:
-                        if 'message' in upd and upd['message'].get('video'):
-                            video = upd['message']['video']
-                            file_id = video.get('file_id')
-                            
-                            # Get file info
-                            file_url = f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}"
-                            file_response = requests.get(file_url)
-                            file_data = file_response.json()
-                            
-                            await update.message.reply_text(
-                                f"📹 *Latest Video Found in Updates*\n\n"
-                                f"📹 *File ID:* `{file_id}`\n"
-                                f"📁 *File Path:* `{file_data.get('result', {}).get('file_path', 'N/A')}`\n\n"
-                                f"*To download:*\n"
-                                f"`https://api.telegram.org/file/bot{Config.BOT_TOKEN}/{file_data.get('result', {}).get('file_path', '')}`",
-                                parse_mode='Markdown'
-                            )
-                            return
-                    
-                    await update.message.reply_text(
-                        "❌ No video messages found in recent updates.",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await update.message.reply_text(
-                        "❌ No updates found. Send a video first!",
-                        parse_mode='Markdown'
-                    )
-            else:
-                await update.message.reply_text(
-                    f"❌ API Error: {data.get('description', 'Unknown error')}",
-                    parse_mode='Markdown'
-                )
-        else:
-            await update.message.reply_text(
-                f"❌ HTTP Error: {response.status_code}",
-                parse_mode='Markdown'
-            )
-                
-    except Exception as e:
-        logger.error(f"Error getting updates: {e}")
-        await update.message.reply_text(
-            f"❌ Error: {str(e)}",
-            parse_mode='Markdown'
-        )
+    await start(update, context)
 
 # Button handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     
-    if data.startswith('copy_'):
+    if data == 'start':
+        await start_callback(update, context)
+    elif data == 'video_help':
+        await video_help(update, context)
+    elif data.startswith('copy_'):
         await copy_id(update, context)
-    elif data.startswith('copypath_'):
-        await copy_file_path(update, context)
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,7 +217,6 @@ def main():
     
     # Command handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("getupdates", get_updates_handler))
     
     # Callback query handler
     application.add_handler(CallbackQueryHandler(button_handler))
