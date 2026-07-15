@@ -1,6 +1,7 @@
 import logging
 import threading
 import requests
+import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -28,50 +29,72 @@ CHANNEL_DESCRIPTION = (
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Video File ID - Replace this with your actual video file ID
-VIDEO_FILE_ID = "BAACAgQAAxkBAANoalfph7q54EiiNPyM-8stDa_gEEUAAqQeAALKX8FSv2h-4Ju__Bc9BA"
+# Video File ID - Will be updated when user sends video
+VIDEO_FILE_ID = None
 
-# Start command - sends video first with File ID
+# Start command - shows video if available, otherwise shows instructions
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global VIDEO_FILE_ID
+    
+    # Check if we have a video ID stored
+    video_id = context.bot_data.get('video_file_id')
+    
     keyboard = [
         [
             InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
-        ],
-        [
-            InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{VIDEO_FILE_ID}')
         ]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    caption = (
-        f"{CHANNEL_DESCRIPTION}\n\n"
-        f"📹 *Video File ID:*\n"
-        f"`{VIDEO_FILE_ID}`\n\n"
-        f"*Click the button below to copy the File ID*"
-    )
-    
-    try:
-        # Send video first with caption
-        await update.message.reply_video(
-            video=VIDEO_FILE_ID,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-    except Exception as e:
-        logger.error(f"Failed to send video: {e}")
-        # Fallback to text message if video fails
-        await update.message.reply_text(
+    if video_id:
+        # Add copy button if video exists
+        keyboard.append([InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{video_id}')])
+        
+        caption = (
             f"{CHANNEL_DESCRIPTION}\n\n"
             f"📹 *Video File ID:*\n"
-            f"`{VIDEO_FILE_ID}`\n\n"
-            f"*Click the button below to copy the File ID*",
+            f"`{video_id}`\n\n"
+            f"*Click the button below to copy the File ID*"
+        )
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        try:
+            # Send video with caption
+            await update.message.reply_video(
+                video=video_id,
+                caption=caption,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            return
+        except Exception as e:
+            logger.error(f"Failed to send video: {e}")
+            # If video fails, show text with ID
+            await update.message.reply_text(
+                f"{CHANNEL_DESCRIPTION}\n\n"
+                f"📹 *Video File ID:*\n"
+                f"`{video_id}`\n\n"
+                f"*Click the button below to copy the File ID*\n\n"
+                f"⚠️ *Note:* The video file may be expired. "
+                f"Please send a new video to update it.",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+    else:
+        # No video stored - show instructions
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"{CHANNEL_DESCRIPTION}\n\n"
+            "📹 *No video uploaded yet!*\n\n"
+            "Please send or forward a *video* to this bot.\n"
+            "The bot will save the video ID and show it here.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
 
-# Handle videos - get file ID
+# Handle videos - get file ID and store it
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle video and return file ID"""
     
@@ -94,22 +117,34 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get File ID directly from the video object
         file_id = video.file_id
         
-        # Create keyboard with ADmin button
+        # Store the video ID in bot_data for persistence
+        context.bot_data['video_file_id'] = file_id
+        
+        # Also store in config for global access
+        global VIDEO_FILE_ID
+        VIDEO_FILE_ID = file_id
+        
+        # Log the file ID
+        logger.info(f"Video File ID saved: {file_id}")
+        
+        # Create keyboard with buttons
         keyboard = [
             [InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{file_id}')],
             [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-            [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
+            [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
+            [InlineKeyboardButton("🔄 Test Video", callback_data=f'test_{file_id}')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Show File ID
         await message.reply_text(
-            f"✅ *Video File ID*\n\n"
+            f"✅ *Video File ID Saved!*\n\n"
             f"`{file_id}`\n\n"
             f"📂 *File Name:* {getattr(video, 'file_name', 'Unknown')}\n"
             f"⏱️ *Duration:* {video.duration}s\n"
             f"📏 *Size:* {video.width}x{video.height}\n"
             f"📦 *File Size:* {video.file_size:,} bytes\n\n"
+            f"*This video will now show when users send /start*\n\n"
             f"*Click the button below to copy the File ID*",
             reply_markup=reply_markup,
             parse_mode='Markdown'
@@ -118,7 +153,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text(
-            "❌ Error processing video. Please try again.",
+            f"❌ Error processing video: {str(e)}",
             parse_mode='Markdown'
         )
 
@@ -150,11 +185,54 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
+# Test video handler
+async def test_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    file_id = query.data.replace('test_', '')
+    
+    keyboard = [
+        [InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{file_id}')],
+        [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
+        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    caption = (
+        f"✅ *Video Test*\n\n"
+        f"📹 *File ID:*\n"
+        f"`{file_id}`\n\n"
+        f"*Click the button below to copy the File ID*"
+    )
+    
+    try:
+        await query.message.delete()
+        await query.message.reply_video(
+            video=file_id,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.error(f"Error playing video: {e}")
+        await query.message.reply_text(
+            f"❌ Error playing video: {str(e)}\n\n"
+            f"File ID: `{file_id}`\n\n"
+            f"*The video file may have expired. Please upload a new video.*",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+
 # Button handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if query.data.startswith('copy_'):
+    data = query.data
+    
+    if data.startswith('copy_'):
         await copy_id(update, context)
+    elif data.startswith('test_'):
+        await test_video(update, context)
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
