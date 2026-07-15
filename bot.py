@@ -1,7 +1,7 @@
 import logging
 import threading
 import requests
-import json
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -29,13 +29,17 @@ CHANNEL_DESCRIPTION = (
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Video File ID - Will be updated when user sends video
-VIDEO_FILE_ID = None
+# Escape Markdown characters
+def escape_markdown(text):
+    """Escape special characters for Markdown"""
+    if not text:
+        return text
+    # Escape these characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+    escape_chars = r'_*[]()~`>#+\-=|{}.!'
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', str(text))
 
-# Start command - shows video if available, otherwise shows instructions
+# Start command - shows video if available
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global VIDEO_FILE_ID
-    
     # Check if we have a video ID stored
     video_id = context.bot_data.get('video_file_id')
     
@@ -53,19 +57,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption = (
             f"{CHANNEL_DESCRIPTION}\n\n"
             f"📹 *Video File ID:*\n"
-            f"`{video_id}`\n\n"
-            f"*Click the button below to copy the File ID*"
+            f"<code>{video_id}</code>\n\n"
+            f"Click the button below to copy the File ID"
         )
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         try:
-            # Send video with caption
+            # Send video with caption using HTML (safer than Markdown)
             await update.message.reply_video(
                 video=video_id,
                 caption=caption,
                 reply_markup=reply_markup,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             return
         except Exception as e:
@@ -74,12 +78,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"{CHANNEL_DESCRIPTION}\n\n"
                 f"📹 *Video File ID:*\n"
-                f"`{video_id}`\n\n"
-                f"*Click the button below to copy the File ID*\n\n"
-                f"⚠️ *Note:* The video file may be expired. "
+                f"<code>{video_id}</code>\n\n"
+                f"Click the button below to copy the File ID\n\n"
+                f"⚠️ Note: The video file may be expired. "
                 f"Please send a new video to update it.",
                 reply_markup=reply_markup,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
     else:
         # No video stored - show instructions
@@ -120,12 +124,12 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Store the video ID in bot_data for persistence
         context.bot_data['video_file_id'] = file_id
         
-        # Also store in config for global access
-        global VIDEO_FILE_ID
-        VIDEO_FILE_ID = file_id
-        
         # Log the file ID
         logger.info(f"Video File ID saved: {file_id}")
+        
+        # Get video details with escaped text
+        file_name = getattr(video, 'file_name', 'Unknown')
+        safe_file_name = escape_markdown(file_name)
         
         # Create keyboard with buttons
         keyboard = [
@@ -136,24 +140,24 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Show File ID
+        # Show File ID using HTML (safer than Markdown)
         await message.reply_text(
-            f"✅ *Video File ID Saved!*\n\n"
-            f"`{file_id}`\n\n"
-            f"📂 *File Name:* {getattr(video, 'file_name', 'Unknown')}\n"
-            f"⏱️ *Duration:* {video.duration}s\n"
-            f"📏 *Size:* {video.width}x{video.height}\n"
-            f"📦 *File Size:* {video.file_size:,} bytes\n\n"
-            f"*This video will now show when users send /start*\n\n"
-            f"*Click the button below to copy the File ID*",
+            f"✅ <b>Video File ID Saved!</b>\n\n"
+            f"<code>{file_id}</code>\n\n"
+            f"📂 <b>File Name:</b> {safe_file_name}\n"
+            f"⏱️ <b>Duration:</b> {video.duration}s\n"
+            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
+            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
+            f"This video will now show when users send /start\n\n"
+            f"Click the button below to copy the File ID",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text(
-            f"❌ Error processing video: {str(e)}",
+            f"❌ Error processing video. Please try again.",
             parse_mode='Markdown'
         )
 
@@ -171,18 +175,16 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 *File ID copied to clipboard!*\n\n"
-        f"`{file_id}`\n\n"
-        f"*Use this ID to send the video:*\n"
-        f"```python\n"
-        f"await bot.send_video(\n"
+        f"📋 <b>File ID copied to clipboard!</b>\n\n"
+        f"<code>{file_id}</code>\n\n"
+        f"<b>Use this ID to send the video:</b>\n"
+        f"<code>await bot.send_video(\n"
         f"    chat_id=chat_id,\n"
         f"    video='{file_id}'\n"
-        f")\n"
-        f"```\n\n"
-        f"*Or send this ID to any bot to use the video.*",
+        f")</code>\n\n"
+        f"Or send this ID to any bot to use the video.",
         reply_markup=reply_markup,
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
 
 # Test video handler
@@ -200,10 +202,10 @@ async def test_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     caption = (
-        f"✅ *Video Test*\n\n"
-        f"📹 *File ID:*\n"
-        f"`{file_id}`\n\n"
-        f"*Click the button below to copy the File ID*"
+        f"✅ <b>Video Test</b>\n\n"
+        f"📹 <b>File ID:</b>\n"
+        f"<code>{file_id}</code>\n\n"
+        f"Click the button below to copy the File ID"
     )
     
     try:
@@ -212,16 +214,16 @@ async def test_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             video=file_id,
             caption=caption,
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     except Exception as e:
         logger.error(f"Error playing video: {e}")
         await query.message.reply_text(
-            f"❌ Error playing video: {str(e)}\n\n"
-            f"File ID: `{file_id}`\n\n"
-            f"*The video file may have expired. Please upload a new video.*",
+            f"❌ <b>Error playing video:</b>\n\n"
+            f"<code>{file_id}</code>\n\n"
+            f"The video file may have expired. Please upload a new video.",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 # Button handler
