@@ -1,7 +1,6 @@
 import logging
 import threading
 import requests
-import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -32,7 +31,7 @@ CHANNEL_DESCRIPTION = (
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Start command - shows the video with File ID
+# Start command - shows video with File ID
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -48,29 +47,43 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = (
         f"{CHANNEL_DESCRIPTION}\n\n"
         f"📹 *Video File ID:*\n"
-        f"<code>{VIDEO_FILE_ID}</code>\n\n"
-        f"Click the button below to copy the File ID"
+        f"`{VIDEO_FILE_ID}`\n\n"
+        f"*Click the button below to copy the File ID*"
     )
     
     try:
-        # Send the video with caption
+        # First, try to send the video
         await update.message.reply_video(
             video=VIDEO_FILE_ID,
             caption=caption,
             reply_markup=reply_markup,
-            parse_mode='HTML'
+            parse_mode='Markdown'
         )
+        logger.info("Video sent successfully")
     except Exception as e:
         logger.error(f"Failed to send video: {e}")
-        # Fallback to text if video fails
-        await update.message.reply_text(
-            f"{CHANNEL_DESCRIPTION}\n\n"
-            f"📹 *Video File ID:*\n"
-            f"<code>{VIDEO_FILE_ID}</code>\n\n"
-            f"Click the button below to copy the File ID",
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
+        # If video fails, send the file as a document instead
+        try:
+            await update.message.reply_document(
+                document=VIDEO_FILE_ID,
+                caption=f"{caption}\n\n⚠️ Video couldn't be played directly, but here's the File ID.",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            logger.info("Video sent as document")
+        except Exception as e2:
+            logger.error(f"Failed to send as document: {e2}")
+            # Final fallback - just show the ID
+            await update.message.reply_text(
+                f"{CHANNEL_DESCRIPTION}\n\n"
+                f"📹 *Video File ID:*\n"
+                f"`{VIDEO_FILE_ID}`\n\n"
+                f"*Click the button below to copy the File ID*\n\n"
+                f"⚠️ *Note:* The video file may not be accessible. "
+                f"Please send a new video to update it.",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
 
 # Handle new videos - get file ID and update
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -78,12 +91,18 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         message = update.message
-        video = message.video if hasattr(message, 'video') else None
+        
+        # Check for video in message
+        video = None
+        if message.video:
+            video = message.video
+        elif hasattr(message, 'video') and message.video:
+            video = message.video
         
         if not video:
             await message.reply_text(
                 "📹 Send or forward a *video* to get its File ID.\n\n"
-                "Or send /start to see the current video.",
+                "Or send /start to see the current video ID.",
                 parse_mode='Markdown'
             )
             return
@@ -106,22 +125,23 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await message.reply_text(
-            f"✅ <b>New Video File ID Saved!</b>\n\n"
-            f"<code>{file_id}</code>\n\n"
-            f"📂 <b>File Name:</b> {file_name}\n"
-            f"⏱️ <b>Duration:</b> {video.duration}s\n"
-            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
-            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
+            f"✅ *New Video File ID Saved!*\n\n"
+            f"`{file_id}`\n\n"
+            f"📂 *File Name:* {file_name}\n"
+            f"⏱️ *Duration:* {video.duration}s\n"
+            f"📏 *Size:* {video.width}x{video.height}\n"
+            f"📦 *File Size:* {video.file_size:,} bytes\n\n"
             f"This video will now show when users send /start\n\n"
-            f"Click the button below to copy the File ID",
+            f"*Click the button below to copy the File ID*",
             reply_markup=reply_markup,
-            parse_mode='HTML'
+            parse_mode='Markdown'
         )
         
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error in handle_video: {e}")
         await update.message.reply_text(
-            f"❌ Error processing video. Please try again.",
+            f"❌ Error processing video: {str(e)[:100]}\n\n"
+            "Please try sending the video again.",
             parse_mode='Markdown'
         )
 
@@ -139,15 +159,17 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 <b>File ID copied to clipboard!</b>\n\n"
-        f"<code>{file_id}</code>\n\n"
-        f"<b>Use this ID to send the video:</b>\n"
-        f"<code>await bot.send_video(\n"
+        f"📋 *File ID copied to clipboard!*\n\n"
+        f"`{file_id}`\n\n"
+        f"*Use this ID to send the video:*\n"
+        f"```python\n"
+        f"await bot.send_video(\n"
         f"    chat_id=chat_id,\n"
         f"    video='{file_id}'\n"
-        f")</code>",
+        f")\n"
+        f"```",
         reply_markup=reply_markup,
-        parse_mode='HTML'
+        parse_mode='Markdown'
     )
 
 # Button handler
@@ -161,7 +183,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
     if update and update.message:
         await update.message.reply_text(
-            "❌ An error occurred. Please try again.",
+            "❌ An error occurred. Please try again.\n\n"
+            "Send /start to see the menu.",
             parse_mode='Markdown'
         )
 
