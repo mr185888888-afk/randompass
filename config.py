@@ -6,7 +6,10 @@ class Config:
     # Get bot token from environment variable
     BOT_TOKEN = os.getenv('BOT_TOKEN')
     
-    # Image URL for logo
+    # Bot username (optional - for display)
+    BOT_USERNAME = os.getenv('BOT_USERNAME', 'PrimeAnalysisBot')
+    
+    # Image URL for logo (optional)
     IMAGE_URL = os.getenv('IMAGE_URL', '')
     
     # Railway settings
