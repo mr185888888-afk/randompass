@@ -34,7 +34,6 @@ def escape_markdown(text):
     """Escape special characters for Markdown"""
     if not text:
         return text
-    # Escape these characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
     escape_chars = r'_*[]()~`>#+\-=|{}.!'
     return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', str(text))
 
@@ -100,24 +99,60 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handle videos - get file ID and store it
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video and return file ID"""
+    """Handle video and return file ID - works with direct and forwarded videos"""
     
     try:
         message = update.message
-        video = message.video
+        video = None
         
+        # Check for video in multiple locations
+        # 1. Direct video in message
+        if hasattr(message, 'video') and message.video:
+            video = message.video
+            logger.info("Video found in message.video")
+        
+        # 2. Check if it's a forwarded video (various forward types)
+        elif hasattr(message, 'forward_from') and message.forward_from:
+            # Check the original message for video
+            if hasattr(message, 'video') and message.video:
+                video = message.video
+                logger.info("Video found in forwarded message")
+        
+        # 3. Check if message has media group (album)
+        elif hasattr(message, 'media_group_id') and message.media_group_id:
+            if hasattr(message, 'video') and message.video:
+                video = message.video
+                logger.info("Video found in media group")
+        
+        # 4. Check for caption entities
+        elif hasattr(message, 'caption_entities') and message.caption_entities:
+            # Try to get video from caption
+            if hasattr(message, 'video') and message.video:
+                video = message.video
+                logger.info("Video found with caption entities")
+        
+        # If still no video, try to get it from the message object directly
         if not video:
-            # If not video, show help
+            # Sometimes video is nested differently
+            if hasattr(message, 'video'):
+                video = message.video
+                if video:
+                    logger.info("Video found in message.video (direct)")
+        
+        # If no video found, handle as normal message
+        if not video:
             if message.text and message.text.startswith('/start'):
                 await start(update, context)
             else:
                 await message.reply_text(
-                    "📹 Send or forward a *video* to get its File ID.\n\n"
-                    "Or send /start to see the video with the File ID.",
+                    "📹 Please send or forward a *video* file.\n\n"
+                    "I didn't detect a video in this message.\n\n"
+                    "Supported formats: MP4, AVI, MOV, MKV",
                     parse_mode='Markdown'
                 )
             return
         
+        # --- VIDEO FOUND - PROCESS IT ---
         # Get File ID directly from the video object
         file_id = video.file_id
         
@@ -127,7 +162,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log the file ID
         logger.info(f"Video File ID saved: {file_id}")
         
-        # Get video details with escaped text
+        # Get video details
         file_name = getattr(video, 'file_name', 'Unknown')
         safe_file_name = escape_markdown(file_name)
         
@@ -140,14 +175,20 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Show File ID using HTML (safer than Markdown)
+        # Check if it was forwarded
+        is_forwarded = bool(message.forward_from or message.forward_origin)
+        
+        # Show File ID using HTML
+        forward_text = "🔄 *Forwarded:* Yes" if is_forwarded else "📤 *Direct Upload:* Yes"
+        
         await message.reply_text(
             f"✅ <b>Video File ID Saved!</b>\n\n"
             f"<code>{file_id}</code>\n\n"
             f"📂 <b>File Name:</b> {safe_file_name}\n"
             f"⏱️ <b>Duration:</b> {video.duration}s\n"
             f"📏 <b>Size:</b> {video.width}x{video.height}\n"
-            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
+            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n"
+            f"{forward_text}\n\n"
             f"This video will now show when users send /start\n\n"
             f"Click the button below to copy the File ID",
             reply_markup=reply_markup,
@@ -155,9 +196,10 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error in handle_video: {e}", exc_info=True)
         await update.message.reply_text(
-            f"❌ Error processing video. Please try again.",
+            f"❌ Error processing video: {str(e)[:100]}\n\n"
+            "Please try sending the video again directly (not forwarded).",
             parse_mode='Markdown'
         )
 
@@ -280,10 +322,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    # Handle video messages (including forwarded)
-    application.add_handler(MessageHandler(filters.VIDEO, handle_video))
-    
-    # Handle all other messages
+    # Handle ALL messages - check for video everywhere
     application.add_handler(MessageHandler(filters.ALL, handle_video))
     
     application.add_error_handler(error_handler)
