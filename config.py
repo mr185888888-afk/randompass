@@ -6,6 +6,9 @@ class Config:
     # Get bot token from environment variable
     BOT_TOKEN = os.getenv('BOT_TOKEN')
     
+    # Image URL for logo (add your logo URL here)
+    IMAGE_URL = os.getenv('IMAGE_URL', '')
+    
     # Railway settings
     PORT = int(os.getenv('PORT', 8443))
     
