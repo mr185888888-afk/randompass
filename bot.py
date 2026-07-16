@@ -20,33 +20,89 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Channel description
+# Channel description with HTML
 CHANNEL_DESCRIPTION = (
-    "🏅📊 *Welcome to Prime Analysis!*\n\n"
+    "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
     "Your ultimate source for real-time sports betting insights. "
     "Get expert predictions, stats and tips to sharpen your betting game. "
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Start command - shows welcome message with buttons (no video)
+# Full menu text with HTML
+MENU_TEXT = (
+    "🏅📊 <b>Prime Analysis</b>\n\n"
+    "<b>Winning Streak Starts Here — Bet Now, Win Big!</b>\n\n"
+    "📋 <b>Resources:</b>\n"
+    "• Shop\n"
+    "• Today's Picks\n"
+    "• Whale Packages\n"
+    "• Contact Us\n\n"
+    "📧 <b>Contact:</b>\n"
+    "Primeanalysis365@gmail.com\n"
+    "+1 (516) 896-6981\n\n"
+    "<i>Copyright ©2025 All rights reserved made by Prime Analysis</i>"
+)
+
+# Start command - shows full menu
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
+        ],
+        [
+            InlineKeyboardButton("📹 Get Video ID", callback_data='get_video'),
+            InlineKeyboardButton("📋 Copy File ID", callback_data='copy_new')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Check if we have a stored video
+    video_id = context.bot_data.get('video_file_id')
+    
+    if video_id:
+        try:
+            # Try to send the video with menu
+            await update.message.reply_video(
+                video=video_id,
+                caption=MENU_TEXT,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+            return
+        except Exception as e:
+            logger.error(f"Failed to send video: {e}")
+    
+    # Fallback: Show text only
     await update.message.reply_text(
-        f"{CHANNEL_DESCRIPTION}\n\n"
-        "📹 *Send or forward a video* to this bot to get its File ID.\n\n"
-        "The bot will save the File ID and show it to you.",
+        MENU_TEXT,
         reply_markup=reply_markup,
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
 
-# Handle videos - get file ID and show it
+# Get video ID instruction
+async def get_video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "📹 <b>How to Get Video File ID</b>\n\n"
+        "1. Send or forward a <b>video</b> to this bot\n"
+        "2. The bot will reply with the <b>File ID</b>\n"
+        "3. Copy the File ID using the button below\n\n"
+        "4. Use the File ID in your messages:\n"
+        "<code>await bot.send_video(chat_id=chat_id, video='FILE_ID')</code>\n\n"
+        "📤 <i>Send a video now to get its File ID!</i>",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+
+# Handle videos - get file ID and store it
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle video and return file ID"""
     
@@ -66,9 +122,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await start(update, context)
             else:
                 await message.reply_text(
-                    "📹 Send or forward a *video* to get its File ID.\n\n"
+                    "📹 Send or forward a <b>video</b> to get its File ID.\n\n"
                     "Or send /start to see the menu.",
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             return
         
@@ -83,29 +139,30 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{file_id}')],
             [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-            [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
+            [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
+            [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Send the File ID
         await message.reply_text(
-            f"✅ *Video Received!*\n\n"
-            f"📹 *File ID:*\n"
-            f"`{file_id}`\n\n"
-            f"📂 *File Name:* {file_name}\n"
-            f"⏱️ *Duration:* {video.duration}s\n"
-            f"📏 *Size:* {video.width}x{video.height}\n"
-            f"📦 *File Size:* {video.file_size:,} bytes\n\n"
-            f"*Click the button below to copy the File ID*",
+            f"✅ <b>Video Received!</b>\n\n"
+            f"📹 <b>File ID:</b>\n"
+            f"<code>{file_id}</code>\n\n"
+            f"📂 <b>File Name:</b> {file_name}\n"
+            f"⏱️ <b>Duration:</b> {video.duration}s\n"
+            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
+            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
+            f"Click the button below to copy the File ID",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text(
             f"❌ Error: {str(e)[:100]}\n\nPlease try again.",
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 # Copy ID handler
@@ -117,29 +174,103 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
+        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 *File ID copied to clipboard!*\n\n"
-        f"`{file_id}`\n\n"
-        f"*Use this ID to send the video:*\n"
-        f"```\n"
-        f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}\n"
-        f"```\n\n"
-        f"*Or use in Python:*\n"
-        f"```python\n"
-        f"await bot.send_video(chat_id=chat_id, video='{file_id}')\n"
-        f"```",
+        f"📋 <b>File ID copied to clipboard!</b>\n\n"
+        f"<code>{file_id}</code>\n\n"
+        f"<b>Use this ID to send the video:</b>\n"
+        f"<code>await bot.send_video(chat_id=chat_id, video='{file_id}')</code>\n\n"
+        f"<b>API Link:</b>\n"
+        f"<code>https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}</code>",
         reply_markup=reply_markup,
-        parse_mode='Markdown'
+        parse_mode='HTML'
+    )
+
+# Copy new ID handler (for the menu button)
+async def copy_new_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    video_id = context.bot_data.get('video_file_id')
+    
+    if not video_id:
+        await query.edit_message_text(
+            "❌ No video has been uploaded yet.\n\n"
+            "Send or forward a <b>video</b> to this bot first.",
+            parse_mode='HTML'
+        )
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
+        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        f"📋 <b>Current Video File ID</b>\n\n"
+        f"<code>{video_id}</code>\n\n"
+        f"Click the button below to copy it.",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+
+# Menu handler
+async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
+            InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
+        ],
+        [
+            InlineKeyboardButton("📹 Get Video ID", callback_data='get_video'),
+            InlineKeyboardButton("📋 Copy File ID", callback_data='copy_new')
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Check if we have a stored video
+    video_id = context.bot_data.get('video_file_id')
+    
+    if video_id:
+        try:
+            await query.message.delete()
+            await query.message.reply_video(
+                video=video_id,
+                caption=MENU_TEXT,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+            return
+        except Exception as e:
+            logger.error(f"Failed to send video: {e}")
+    
+    await query.edit_message_text(
+        MENU_TEXT,
+        reply_markup=reply_markup,
+        parse_mode='HTML'
     )
 
 # Button handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if query.data.startswith('copy_'):
+    data = query.data
+    
+    if data == 'menu':
+        await menu_handler(update, context)
+    elif data == 'get_video':
+        await get_video_handler(update, context)
+    elif data == 'copy_new':
+        await copy_new_handler(update, context)
+    elif data.startswith('copy_'):
         await copy_id(update, context)
 
 # Error handler
@@ -149,7 +280,12 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ An error occurred. Please try again.\n\n"
             "Send /start to see the menu.",
-            parse_mode='Markdown'
+            parse_mode='HTML'
+        )
+    elif update and update.callback_query:
+        await update.callback_query.message.reply_text(
+            "❌ An error occurred. Please try again.",
+            parse_mode='HTML'
         )
 
 # Clear webhook
