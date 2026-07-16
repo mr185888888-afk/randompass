@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Channel description
 CHANNEL_DESCRIPTION = (
-    "🏅📊 *Welcome to Prime Analysis!*\n\n"
+    "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
     "Your ultimate source for real-time sports betting insights. "
     "Get expert predictions, stats and tips to sharpen your betting game. "
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 video=video_id,
                 caption=CHANNEL_DESCRIPTION,
                 reply_markup=reply_markup,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             return
         except Exception as e:
@@ -58,10 +58,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Fallback: Show text message
     await update.message.reply_text(
         f"{CHANNEL_DESCRIPTION}\n\n"
-        "📹 *Send or forward a video* to this bot to get its File ID.\n"
+        "📹 <b>Send or forward a video</b> to this bot to get its File ID.\n"
         "The bot will save it and show it here.",
         reply_markup=reply_markup,
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
 
 # Handle videos - get file ID and store it
@@ -78,9 +78,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await start(update, context)
             else:
                 await message.reply_text(
-                    "📹 Send or forward a *video* to get its File ID.\n\n"
+                    "📹 Send or forward a <b>video</b> to get its File ID.\n\n"
                     "Or send /start to see the menu.",
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             return
         
@@ -102,22 +102,22 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await message.reply_text(
-            f"✅ *Video File ID Saved!*\n\n"
-            f"`{file_id}`\n\n"
-            f"📂 *File Name:* {file_name}\n"
-            f"⏱️ *Duration:* {video.duration}s\n"
-            f"📏 *Size:* {video.width}x{video.height}\n"
-            f"📦 *File Size:* {video.file_size:,} bytes\n\n"
+            f"✅ <b>Video File ID Saved!</b>\n\n"
+            f"<code>{file_id}</code>\n\n"
+            f"📂 <b>File Name:</b> {file_name}\n"
+            f"⏱️ <b>Duration:</b> {video.duration}s\n"
+            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
+            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
             f"Send /start to see this video in the welcome message!",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text(
             f"❌ Error: {str(e)[:100]}\n\nPlease try again.",
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 # Copy ID handler
@@ -134,14 +134,12 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 *File ID copied to clipboard!*\n\n"
-        f"`{file_id}`\n\n"
-        f"*Use this ID to send the video:*\n"
-        f"```\n"
-        f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}\n"
-        f"```",
+        f"📋 <b>File ID copied to clipboard!</b>\n\n"
+        f"<code>{file_id}</code>\n\n"
+        f"<b>Use this ID to send the video:</b>\n"
+        f"<code>https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}</code>",
         reply_markup=reply_markup,
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
 
 # Test video handler
@@ -162,15 +160,15 @@ async def test_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         await query.message.reply_video(
             video=file_id,
-            caption=f"✅ *Video Test*\n\n`{file_id}`",
+            caption=f"✅ <b>Video Test</b>\n\n<code>{file_id}</code>",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
     except Exception as e:
         await query.message.reply_text(
-            f"❌ Video not accessible. Please upload a new video.\n\n`{file_id}`",
+            f"❌ Video not accessible. Please upload a new video.\n\n<code>{file_id}</code>",
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 # Button handler
@@ -190,7 +188,12 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ An error occurred. Please try again.\n\n"
             "Send /start to see the menu.",
-            parse_mode='Markdown'
+            parse_mode='HTML'
+        )
+    elif update and update.callback_query:
+        await update.callback_query.message.reply_text(
+            "❌ An error occurred. Please try again.",
+            parse_mode='HTML'
         )
 
 # Clear webhook
