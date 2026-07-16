@@ -1,6 +1,8 @@
 import logging
 import threading
 import requests
+import random
+import string
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -42,8 +44,6 @@ REVERSE_MESSAGE = (
 
 # Password generation function
 def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbols=True):
-    import random
-    import string
     lowercase = string.ascii_lowercase
     uppercase = string.ascii_uppercase if use_uppercase else ''
     numbers = string.digits if use_numbers else ''
@@ -69,9 +69,6 @@ def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbo
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GLOBAL_BOT_MODE
     
-    # Get video ID from bot_data
-    video_id = context.bot_data.get('video_file_id')
-    
     if GLOBAL_BOT_MODE == "REDIRECT":
         # REDIRECT MODE: Show video + channel buttons
         keyboard = [
@@ -82,6 +79,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        # Get video ID from bot_data
+        video_id = context.bot_data.get('video_file_id')
+        
         if video_id:
             try:
                 await update.message.reply_video(
@@ -90,7 +90,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=reply_markup,
                     parse_mode='HTML'
                 )
-                logger.info("✅ Redirect mode - Video sent successfully!")
+                logger.info("✅ Video sent successfully!")
                 return
             except Exception as e:
                 logger.error(f"Failed to send video: {e}")
@@ -122,6 +122,43 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
 
+# --- HANDLE VIDEO UPLOADS (Automatically saves video ID) ---
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        message = update.message
+        video = message.video
+        
+        if not video:
+            return
+        
+        # Get the File ID and save it to bot_data
+        video_id = video.file_id
+        context.bot_data['video_file_id'] = video_id
+        
+        # Get video details
+        file_name = getattr(video, 'file_name', 'Unknown')
+        
+        await message.reply_text(
+            f"✅ <b>Video Saved Successfully!</b>\n\n"
+            f"📂 <b>File Name:</b> {file_name}\n"
+            f"⏱️ <b>Duration:</b> {video.duration}s\n"
+            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
+            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
+            f"📹 <b>Video ID saved:</b>\n"
+            f"<code>{video_id}</code>\n\n"
+            f"Send /start to see the video in the welcome message!",
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"✅ Video saved: {video_id}")
+        
+    except Exception as e:
+        logger.error(f"Error saving video: {e}")
+        await update.message.reply_text(
+            f"❌ Error saving video: {str(e)[:100]}",
+            parse_mode='HTML'
+        )
+
 # --- TEXT HANDLER (Intercepts REDIRECT/REVERSE commands) ---
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GLOBAL_BOT_MODE
@@ -150,36 +187,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # If in REDIRECT mode, ignore all other text messages
     if GLOBAL_BOT_MODE == "REDIRECT":
         return
-
-# --- HANDLE VIDEO UPLOADS (Saves video ID) ---
-async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        message = update.message
-        video = message.video
-        
-        if not video:
-            return
-        
-        # Get the File ID and save it
-        video_id = video.file_id
-        context.bot_data['video_file_id'] = video_id
-        
-        # Get video details
-        file_name = getattr(video, 'file_name', 'Unknown')
-        
-        await message.reply_text(
-            f"✅ <b>Video Saved!</b>\n\n"
-            f"📂 <b>File Name:</b> {file_name}\n"
-            f"⏱️ <b>Duration:</b> {video.duration}s\n"
-            f"📏 <b>Size:</b> {video.width}x{video.height}\n\n"
-            f"Send /start to see the video in the welcome message!",
-            parse_mode='HTML'
-        )
-        
-        logger.info(f"✅ Video saved: {video_id}")
-        
-    except Exception as e:
-        logger.error(f"Error saving video: {e}")
 
 # --- PASSWORD MENU ---
 async def password_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -301,7 +308,6 @@ async def generate_number_handler(update: Update, context: ContextTypes.DEFAULT_
     if GLOBAL_BOT_MODE == "REDIRECT":
         return
     
-    import random
     query = update.callback_query
     await query.answer()
     
@@ -349,7 +355,6 @@ async def handle_custom_range(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not context.user_data.get('waiting_for_range'):
         return
     
-    import random
     try:
         parts = update.message.text.split()
         if len(parts) != 2:
