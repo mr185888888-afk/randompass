@@ -20,6 +20,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Your working Video File ID
+VIDEO_FILE_ID = "BAACAgQAAxkBAAOqalhoF0J6aDBYMwqetdkzy7p5gMAAAgUfAALKX8LSBkXisCadrWY9BA"
+
 # Channel description
 CHANNEL_DESCRIPTION = (
     "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
@@ -28,7 +31,7 @@ CHANNEL_DESCRIPTION = (
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Start command
+# Start command - shows video with welcome message
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -36,86 +39,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
         ],
         [
-            InlineKeyboardButton("📹 Get Video ID", callback_data='video_help')
+            InlineKeyboardButton("📋 Copy File ID", callback_data='copy')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(
-        CHANNEL_DESCRIPTION,
-        reply_markup=reply_markup,
-        parse_mode='HTML'
+    caption = (
+        f"{CHANNEL_DESCRIPTION}\n\n"
+        f"📹 <b>Video File ID:</b>\n"
+        f"<code>{VIDEO_FILE_ID}</code>\n\n"
+        f"Click the button below to copy the File ID"
     )
-
-# Video help
-async def video_help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
     
-    keyboard = [
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        "📹 <b>How to Get Video File ID</b>\n\n"
-        "1. Send or forward a <b>video</b> to this bot\n"
-        "2. The bot will reply with the <b>File ID</b>\n"
-        "3. Copy the File ID\n\n"
-        "📤 <i>Send a video now to get its File ID!</i>",
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
-
-# Handle videos
-async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        message = update.message
-        video = message.video if message.video else None
-        
-        if not video:
-            if message.text and message.text.startswith('/start'):
-                await start(update, context)
-            else:
-                await message.reply_text(
-                    "📹 Send or forward a <b>video</b> to get its File ID.\n\n"
-                    "Or send /start to see the menu.",
-                    parse_mode='HTML'
-                )
-            return
-        
-        file_id = video.file_id
-        file_name = getattr(video, 'file_name', 'Unknown')
-        
-        context.bot_data['video_file_id'] = file_id
-        
-        keyboard = [
-            [InlineKeyboardButton("📋 Copy File ID", callback_data='copy')],
-            [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-            [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
-            [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        context.user_data['last_file_id'] = file_id
-        
-        await message.reply_text(
-            f"✅ <b>Video Received!</b>\n\n"
-            f"📹 <b>File ID:</b>\n"
-            f"<code>{file_id}</code>\n\n"
-            f"📂 <b>File Name:</b> {file_name}\n"
-            f"⏱️ <b>Duration:</b> {video.duration}s\n"
-            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
-            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
-            f"Click the button below to copy the File ID",
+        # Send the video with welcome message
+        await update.message.reply_video(
+            video=VIDEO_FILE_ID,
+            caption=caption,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
-        
+        logger.info("Video sent successfully!")
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Failed to send video: {e}")
+        # Fallback to text if video fails
         await update.message.reply_text(
-            f"❌ Error: {str(e)[:100]}\n\nPlease try again.",
+            f"{CHANNEL_DESCRIPTION}\n\n"
+            f"📹 <b>Video File ID:</b>\n"
+            f"<code>{VIDEO_FILE_ID}</code>\n\n"
+            f"Click the button below to copy the File ID",
+            reply_markup=reply_markup,
             parse_mode='HTML'
         )
 
@@ -124,49 +77,17 @@ async def copy_id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    file_id = context.user_data.get('last_file_id')
-    
-    if not file_id:
-        await query.message.reply_text(
-            "❌ No video found. Please send a video first.",
-            parse_mode='HTML'
-        )
-        return
-    
     keyboard = [
         [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')],
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data='menu')]
+        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 <b>File ID</b>\n\n"
-        f"<code>{file_id}</code>\n\n"
+        f"📋 <b>File ID copied to clipboard!</b>\n\n"
+        f"<code>{VIDEO_FILE_ID}</code>\n\n"
         f"<b>Use this ID to send the video:</b>\n"
-        f"<code>await bot.send_video(chat_id=chat_id, video='{file_id}')</code>",
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
-
-# Menu handler
-async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
-            InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
-        ],
-        [
-            InlineKeyboardButton("📹 Get Video ID", callback_data='video_help')
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        CHANNEL_DESCRIPTION,
+        f"<code>await bot.send_video(chat_id=chat_id, video='{VIDEO_FILE_ID}')</code>",
         reply_markup=reply_markup,
         parse_mode='HTML'
     )
@@ -174,13 +95,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Button handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    data = query.data
-    
-    if data == 'menu':
-        await menu_handler(update, context)
-    elif data == 'video_help':
-        await video_help_handler(update, context)
-    elif data == 'copy':
+    if query.data == 'copy':
         await copy_id_handler(update, context)
 
 # Error handler
@@ -233,12 +148,11 @@ def main():
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.VIDEO, handle_video))
-    application.add_handler(MessageHandler(filters.ALL, handle_video))
     
     application.add_error_handler(error_handler)
     
     logger.info("🤖 Prime Analysis Bot is running...")
+    logger.info(f"📹 Video File ID: {VIDEO_FILE_ID}")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
