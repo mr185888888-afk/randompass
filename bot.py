@@ -20,84 +20,66 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# YOUR WORKING VIDEO FILE ID FROM API
-VIDEO_FILE_ID = "BAACAgQAAxkBAAOCalf48UV309mFj3o1pFgXsseppysAAsweAALKX8FSjfd2JQqbd-g9BA"
-
 # Channel description
 CHANNEL_DESCRIPTION = (
-    "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
+    "🏅📊 *Welcome to Prime Analysis!*\n\n"
     "Your ultimate source for real-time sports betting insights. "
     "Get expert predictions, stats and tips to sharpen your betting game. "
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Start command - shows the video with File ID
+# Start command - shows welcome message with buttons (no video)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
-        ],
-        [
-            InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{VIDEO_FILE_ID}')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    caption = (
+    await update.message.reply_text(
         f"{CHANNEL_DESCRIPTION}\n\n"
-        f"📹 <b>Video File ID:</b>\n"
-        f"<code>{VIDEO_FILE_ID}</code>\n\n"
-        f"Click the button below to copy the File ID"
+        "📹 *Send or forward a video* to this bot to get its File ID.\n\n"
+        "The bot will save the File ID and show it to you.",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
     )
-    
-    try:
-        # Send the video with caption
-        await update.message.reply_video(
-            video=VIDEO_FILE_ID,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
-        logger.info("Video sent successfully!")
-    except Exception as e:
-        logger.error(f"Failed to send video: {e}")
-        # Fallback to text if video fails
-        await update.message.reply_text(
-            f"{CHANNEL_DESCRIPTION}\n\n"
-            f"📹 <b>Video File ID:</b>\n"
-            f"<code>{VIDEO_FILE_ID}</code>\n\n"
-            f"Click the button below to copy the File ID",
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
 
-# Handle new videos - get file ID and update
+# Handle videos - get file ID and show it
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video uploads and return file ID"""
+    """Handle video and return file ID"""
     
     try:
         message = update.message
-        video = message.video if hasattr(message, 'video') else None
+        
+        # Check for video
+        video = None
+        if message.video:
+            video = message.video
+        elif hasattr(message, 'video') and message.video:
+            video = message.video
         
         if not video:
-            await message.reply_text(
-                "📹 Send or forward a <b>video</b> to get its File ID.\n\n"
-                "Or send /start to see the current video.",
-                parse_mode='HTML'
-            )
+            # If not video, show menu
+            if message.text and message.text.startswith('/start'):
+                await start(update, context)
+            else:
+                await message.reply_text(
+                    "📹 Send or forward a *video* to get its File ID.\n\n"
+                    "Or send /start to see the menu.",
+                    parse_mode='Markdown'
+                )
             return
         
         # Get File ID
         file_id = video.file_id
-        
-        # Update the global video ID
-        global VIDEO_FILE_ID
-        VIDEO_FILE_ID = file_id
-        
-        # Get video details
         file_name = getattr(video, 'file_name', 'Unknown')
         
+        # Store in bot_data
+        context.bot_data['video_file_id'] = file_id
+        
+        # Create keyboard with buttons
         keyboard = [
             [InlineKeyboardButton("📋 Copy File ID", callback_data=f'copy_{file_id}')],
             [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
@@ -105,24 +87,25 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        # Send the File ID
         await message.reply_text(
-            f"✅ <b>New Video File ID Saved!</b>\n\n"
-            f"<code>{file_id}</code>\n\n"
-            f"📂 <b>File Name:</b> {file_name}\n"
-            f"⏱️ <b>Duration:</b> {video.duration}s\n"
-            f"📏 <b>Size:</b> {video.width}x{video.height}\n"
-            f"📦 <b>File Size:</b> {video.file_size:,} bytes\n\n"
-            f"This video will now show when users send /start\n\n"
-            f"Click the button below to copy the File ID",
+            f"✅ *Video Received!*\n\n"
+            f"📹 *File ID:*\n"
+            f"`{file_id}`\n\n"
+            f"📂 *File Name:* {file_name}\n"
+            f"⏱️ *Duration:* {video.duration}s\n"
+            f"📏 *Size:* {video.width}x{video.height}\n"
+            f"📦 *File Size:* {video.file_size:,} bytes\n\n"
+            f"*Click the button below to copy the File ID*",
             reply_markup=reply_markup,
-            parse_mode='HTML'
+            parse_mode='Markdown'
         )
         
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text(
-            f"❌ Error processing video. Please try again.",
-            parse_mode='HTML'
+            f"❌ Error: {str(e)[:100]}\n\nPlease try again.",
+            parse_mode='Markdown'
         )
 
 # Copy ID handler
@@ -139,15 +122,18 @@ async def copy_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        f"📋 <b>File ID copied to clipboard!</b>\n\n"
-        f"<code>{file_id}</code>\n\n"
-        f"<b>Use this ID to send the video:</b>\n"
-        f"<code>await bot.send_video(\n"
-        f"    chat_id=chat_id,\n"
-        f"    video='{file_id}'\n"
-        f")</code>",
+        f"📋 *File ID copied to clipboard!*\n\n"
+        f"`{file_id}`\n\n"
+        f"*Use this ID to send the video:*\n"
+        f"```\n"
+        f"https://api.telegram.org/bot{Config.BOT_TOKEN}/getFile?file_id={file_id}\n"
+        f"```\n\n"
+        f"*Or use in Python:*\n"
+        f"```python\n"
+        f"await bot.send_video(chat_id=chat_id, video='{file_id}')\n"
+        f"```",
         reply_markup=reply_markup,
-        parse_mode='HTML'
+        parse_mode='Markdown'
     )
 
 # Button handler
@@ -163,7 +149,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ An error occurred. Please try again.\n\n"
             "Send /start to see the menu.",
-            parse_mode='HTML'
+            parse_mode='Markdown'
         )
 
 # Clear webhook
@@ -206,7 +192,6 @@ def main():
     application.add_error_handler(error_handler)
     
     logger.info("🤖 Prime Analysis Bot is running...")
-    logger.info(f"📹 Video File ID: {VIDEO_FILE_ID}")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
