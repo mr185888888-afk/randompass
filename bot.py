@@ -21,10 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global Bot Mode
-GLOBAL_BOT_MODE = "REDIRECT"  # Can be "REDIRECT" (video+channel) or "REVERSE" (tools)
-
-# Your Video File ID
-VIDEO_FILE_ID = "BAACAgQAAxkBAAOqalhoF0J6aDBYMwqetdkzy7p5gMAAAgUfAALKX8LSBkXisCadrWY9BA"
+GLOBAL_BOT_MODE = "REDIRECT"  # Can be "REDIRECT" or "REVERSE"
 
 # Welcome message for REDIRECT mode
 REDIRECT_MESSAGE = (
@@ -72,6 +69,9 @@ def generate_password(length=12, use_uppercase=True, use_numbers=True, use_symbo
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GLOBAL_BOT_MODE
     
+    # Get video ID from bot_data
+    video_id = context.bot_data.get('video_file_id')
+    
     if GLOBAL_BOT_MODE == "REDIRECT":
         # REDIRECT MODE: Show video + channel buttons
         keyboard = [
@@ -82,23 +82,26 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        try:
-            await update.message.reply_video(
-                video=VIDEO_FILE_ID,
-                caption=REDIRECT_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-            logger.info("✅ Redirect mode - Video sent successfully!")
-            return
-        except Exception as e:
-            logger.error(f"Failed to send video: {e}")
-            await update.message.reply_text(
-                REDIRECT_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-            return
+        if video_id:
+            try:
+                await update.message.reply_video(
+                    video=video_id,
+                    caption=REDIRECT_MESSAGE,
+                    reply_markup=reply_markup,
+                    parse_mode='HTML'
+                )
+                logger.info("✅ Redirect mode - Video sent successfully!")
+                return
+            except Exception as e:
+                logger.error(f"Failed to send video: {e}")
+        
+        # If no video or video fails, send text only
+        await update.message.reply_text(
+            REDIRECT_MESSAGE + "\n\n📹 <i>Send a video to this bot to set it as the welcome video.</i>",
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        return
     
     else:
         # REVERSE MODE: Show normal tools
@@ -116,7 +119,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             REVERSE_MESSAGE,
             reply_markup=reply_markup,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
 # --- TEXT HANDLER (Intercepts REDIRECT/REVERSE commands) ---
@@ -147,6 +150,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # If in REDIRECT mode, ignore all other text messages
     if GLOBAL_BOT_MODE == "REDIRECT":
         return
+
+# --- HANDLE VIDEO UPLOADS (Saves video ID) ---
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        message = update.message
+        video = message.video
+        
+        if not video:
+            return
+        
+        # Get the File ID and save it
+        video_id = video.file_id
+        context.bot_data['video_file_id'] = video_id
+        
+        # Get video details
+        file_name = getattr(video, 'file_name', 'Unknown')
+        
+        await message.reply_text(
+            f"✅ <b>Video Saved!</b>\n\n"
+            f"📂 <b>File Name:</b> {file_name}\n"
+            f"⏱️ <b>Duration:</b> {video.duration}s\n"
+            f"📏 <b>Size:</b> {video.width}x{video.height}\n\n"
+            f"Send /start to see the video in the welcome message!",
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"✅ Video saved: {video_id}")
+        
+    except Exception as e:
+        logger.error(f"Error saving video: {e}")
 
 # --- PASSWORD MENU ---
 async def password_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -571,6 +604,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     
     # Message handlers
+    application.add_handler(MessageHandler(filters.VIDEO, handle_video))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_range))
     
