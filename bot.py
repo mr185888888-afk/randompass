@@ -6,8 +6,6 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    filters,
     ContextTypes
 )
 
@@ -23,8 +21,8 @@ logger = logging.getLogger(__name__)
 # Your working Video File ID
 VIDEO_FILE_ID = "BAACAgQAAxkBAAOqalhoF0J6aDBYMwqetdkzy7p5gMAAAgUfAALKX8LSBkXisCadrWY9BA"
 
-# Channel description
-CHANNEL_DESCRIPTION = (
+# Welcome message - NO FILE ID TEXT
+WELCOME_MESSAGE = (
     "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
     "Your ultimate source for real-time sports betting insights. "
     "Get expert predictions, stats and tips to sharpen your betting game. "
@@ -37,25 +35,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss'),
             InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')
-        ],
-        [
-            InlineKeyboardButton("📋 Copy File ID", callback_data='copy')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    caption = (
-        f"{CHANNEL_DESCRIPTION}\n\n"
-        f"📹 <b>Video File ID:</b>\n"
-        f"<code>{VIDEO_FILE_ID}</code>\n\n"
-        f"Click the button below to copy the File ID"
-    )
-    
     try:
-        # Send the video with welcome message
+        # Send the video with welcome message (NO File ID text)
         await update.message.reply_video(
             video=VIDEO_FILE_ID,
-            caption=caption,
+            caption=WELCOME_MESSAGE,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
@@ -64,39 +52,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to send video: {e}")
         # Fallback to text if video fails
         await update.message.reply_text(
-            f"{CHANNEL_DESCRIPTION}\n\n"
-            f"📹 <b>Video File ID:</b>\n"
-            f"<code>{VIDEO_FILE_ID}</code>\n\n"
-            f"Click the button below to copy the File ID",
+            WELCOME_MESSAGE,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
-
-# Copy ID handler
-async def copy_id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    keyboard = [
-        [InlineKeyboardButton("👑 ADmin", url='https://t.me/PrimeAnalysiss')],
-        [InlineKeyboardButton("📊 View Channel", url='https://t.me/PRIMEANALYS')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.message.reply_text(
-        f"📋 <b>File ID copied to clipboard!</b>\n\n"
-        f"<code>{VIDEO_FILE_ID}</code>\n\n"
-        f"<b>Use this ID to send the video:</b>\n"
-        f"<code>await bot.send_video(chat_id=chat_id, video='{VIDEO_FILE_ID}')</code>",
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
-
-# Button handler
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if query.data == 'copy':
-        await copy_id_handler(update, context)
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,12 +64,6 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ An error occurred. Please try again.\n\n"
             "Send /start to see the menu.",
-            parse_mode='HTML'
-        )
-    elif update and update.callback_query:
-        await update.callback_query.answer()
-        await update.callback_query.message.reply_text(
-            "❌ An error occurred. Please try again.",
             parse_mode='HTML'
         )
 
@@ -147,8 +100,6 @@ def main():
     application = Application.builder().token(Config.BOT_TOKEN).build()
     
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    
     application.add_error_handler(error_handler)
     
     logger.info("🤖 Prime Analysis Bot is running...")
