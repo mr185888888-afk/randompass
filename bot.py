@@ -2,13 +2,7 @@ import logging
 import threading
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config import Config
 
@@ -19,18 +13,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Default Video File ID
-DEFAULT_VIDEO_ID = "BAACAgQAAxkBAAOqalhoF0J6aDBYMwqetdkzy7p5gMAAAgUfAALKX8LSBkXisCadrWY9BA"
+# YOUR VIDEO FILE ID
+VIDEO_FILE_ID = "BAACAgQAAxkBAAOqalhoF0J6aDBYMwqetdkzy7p5gMAAAgUfAALKX8LSBkXisCadrWY9BA"
 
-# Welcome message
+# Welcome message - NO FILE ID TEXT
 WELCOME_MESSAGE = (
-    "🏅📊 *Welcome to Prime Analysis!*\n\n"
+    "🏅📊 <b>Welcome to Prime Analysis!</b>\n\n"
     "Your ultimate source for real-time sports betting insights. "
     "Get expert predictions, stats and tips to sharpen your betting game. "
     "Join us for updates and discussions as we keep you ahead of the curve 📊"
 )
 
-# Start command - shows welcome message with buttons
+# Start command - shows VIDEO with welcome message
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -40,28 +34,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(
-        WELCOME_MESSAGE,
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+    try:
+        # Send the VIDEO (not the ID) with welcome message
+        await update.message.reply_video(
+            video=VIDEO_FILE_ID,
+            caption=WELCOME_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        logger.info("✅ Video sent successfully!")
+    except Exception as e:
+        logger.error(f"Failed to send video: {e}")
+        # If video fails, send text only
+        await update.message.reply_text(
+            WELCOME_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Error: {context.error}")
-    if update and update.message:
-        await update.message.reply_text(
-            "❌ An error occurred. Please try again.\n\n"
-            "Send /start to see the menu.",
-            parse_mode='Markdown'
-        )
 
 # Clear webhook
 def clear_webhook():
     try:
         url = f"https://api.telegram.org/bot{Config.BOT_TOKEN}/deleteWebhook"
-        response = requests.get(url)
-        logger.info(f"Webhook cleared: {response.json()}")
+        requests.get(url)
+        logger.info("Webhook cleared")
     except Exception as e:
         logger.error(f"Error clearing webhook: {e}")
 
@@ -75,7 +75,6 @@ def run_web_server():
                 self.end_headers()
                 self.wfile.write(b"OK")
         server = HTTPServer(('0.0.0.0', Config.PORT), HealthHandler)
-        logger.info(f"Web server running on port {Config.PORT}")
         server.serve_forever()
     except Exception as e:
         logger.error(f"Web server error: {e}")
